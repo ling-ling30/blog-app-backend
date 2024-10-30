@@ -1,15 +1,27 @@
 {
   "name": "my-hono-app",
   "scripts": {
-    "dev": "wrangler dev",
+    "dev": "wrangler dev --remote",
     "deploy": "wrangler deploy --minify",
-    "cf-typegen": "wrangler types --env-interface CloudflareBindings"
+    "cf-typegen": "wrangler types --env-interface CloudflareBindings",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:dev": "drizzle-kit studio"
   },
   "dependencies": {
-    "hono": "^4.6.7"
+    "@hono/node-server": "^1.13.3",
+    "@hono/zod-openapi": "^0.16.4",
+    "dotenv": "^16.4.5",
+    "drizzle-orm": "^0.36.0",
+    "hono": "^4.6.8",
+    "my-hono-app": "file:",
+    "stoker": "^1.2.7",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20241022.0",
+    "drizzle-kit": "^0.27.0",
+    "tsx": "^4.19.2",
     "wrangler": "^3.79.0"
   }
 }
