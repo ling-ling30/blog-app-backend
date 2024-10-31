@@ -1,8 +1,8 @@
 import { eq } from "drizzle-orm";
-import { categories, DrizzleDB } from "../../db";
+import { tags, DrizzleDB } from "../../db";
 
-export const categoryModule = (db: DrizzleDB) => {
-  const create = async (content: { name: string; description?: string }) => {
+export const tagModule = (db: DrizzleDB) => {
+  const create = async (content: { name: string }) => {
     // Improve slug generation to handle more edge cases
     const slug = content.name
       .toLowerCase()
@@ -11,46 +11,37 @@ export const categoryModule = (db: DrizzleDB) => {
       .replace(/\s+/g, "-"); // Replace spaces with hyphens
 
     return await db
-      .insert(categories)
+      .insert(tags)
       .values({
         name: content.name,
         slug,
-        description: content.description || null,
       })
       .returning()
       .get();
   };
 
   const getAll = async () => {
-    return await db.select().from(categories).orderBy(categories.createdAt);
+    return await db.select().from(tags).orderBy(tags.createdAt);
   };
 
   const getById = async (id: number) => {
-    return await db
-      .select()
-      .from(categories)
-      .where(eq(categories.id, id))
-      .get();
+    return await db.select().from(tags).where(eq(tags.id, id)).get();
   };
 
   const update = async (
     id: number,
-    data: Partial<typeof categories.$inferInsert>
+    data: Partial<typeof tags.$inferInsert>
   ) => {
     return await db
-      .update(categories)
+      .update(tags)
       .set(data)
-      .where(eq(categories.id, id))
+      .where(eq(tags.id, id))
       .returning()
       .get();
   };
 
   const remove = async (id: number) => {
-    return await db
-      .delete(categories)
-      .where(eq(categories.id, id))
-      .returning()
-      .get();
+    return await db.delete(tags).where(eq(tags.id, id)).returning().get();
   };
 
   return {

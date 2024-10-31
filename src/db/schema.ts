@@ -12,7 +12,7 @@ export const PostStatus = {
 export const posts = table(
   "posts",
   {
-    id: t.text("id").primaryKey(),
+    id: t.text("id").primaryKey().default(crypto.randomUUID()),
     title: t.text("title").notNull(),
     slug: t.text("slug").notNull().unique(),
     content: t.text("content").notNull(),
@@ -49,7 +49,7 @@ export const postsCategories = table(
   "post_categories",
   {
     postId: t
-      .integer("post_id")
+      .text("post_id")
       .references(() => posts.id, { onDelete: "cascade" })
       .notNull(),
     categoryId: t
@@ -85,7 +85,7 @@ export const postsTags = table(
   "post_tags",
   {
     postId: t
-      .integer("post_id")
+      .text("post_id")
       .references(() => posts.id, { onDelete: "cascade" })
       .notNull(),
     tagId: t
