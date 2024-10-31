@@ -11,4 +11,5 @@ export default defineConfig({
     databaseId: env.CLOUDFLARE_DATABASE_ID,
     token: env.CLOUDFLARE_D1_TOKEN,
   },
+  tablesFilter: ["/^(?!.*_cf_KV).*$/"],
 });

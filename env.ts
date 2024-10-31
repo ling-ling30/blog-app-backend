@@ -4,7 +4,7 @@ const envSchema = z.object({
   CLOUDFLARE_ACCOUNT_ID: z.string(),
   CLOUDFLARE_DATABASE_ID: z.string(),
   CLOUDFLARE_D1_TOKEN: z.string(),
-  PORT: z.number().optional().default(3000),
+  // PORT: z.number().optional().default(3000),
 });
 
 type Env = z.infer<typeof envSchema>;
