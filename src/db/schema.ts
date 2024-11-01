@@ -12,7 +12,7 @@ export const PostStatus = {
 export const posts = table(
   "posts",
   {
-    id: t.text("id").primaryKey().default(crypto.randomUUID()),
+    id: t.text("id").primaryKey(),
     title: t.text("title").notNull(),
     slug: t.text("slug").notNull().unique(),
     content: t.text("content").notNull(),

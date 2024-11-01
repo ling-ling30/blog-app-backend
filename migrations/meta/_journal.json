@@ -36,6 +36,13 @@
       "when": 1730382902446,
       "tag": "0004_nice_firebrand",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1730428875092,
+      "tag": "0005_gray_stick",
+      "breakpoints": true
     }
   ]
 }

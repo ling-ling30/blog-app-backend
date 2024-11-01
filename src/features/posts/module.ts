@@ -1,17 +1,11 @@
 import { eq, and } from "drizzle-orm";
 import { posts, postsCategories, postsTags, DrizzleDB } from "../../db";
 import { PostStatus } from "../../db/schema"; // Assuming you've defined this
+import { z } from "zod";
+import { createPostSchema } from "../../types";
 
 export const postModule = (db: DrizzleDB) => {
-  const create = async (content: {
-    title: string;
-    content: string;
-    status?: keyof typeof PostStatus;
-    excerpt?: string;
-    featuredImageUrl?: string;
-    categories?: number[];
-    tags?: number[];
-  }) => {
+  const create = async (content: z.infer<typeof createPostSchema>) => {
     // Improve slug generation
     const slug = content.title
       .toLowerCase()
@@ -19,41 +13,55 @@ export const postModule = (db: DrizzleDB) => {
       .replace(/[^\w\s-]/g, "") // Remove special characters
       .replace(/\s+/g, "-"); // Replace spaces with hyphens
 
-    return await db.transaction(async (tx) => {
-      // Insert post
-      const [post] = await tx
-        .insert(posts)
-        .values({
-          title: content.title,
-          slug,
-          content: content.content,
-          status: content.status || "DRAFT",
-          excerpt: content.excerpt,
-          featuredImageUrl: content.featuredImageUrl,
-        })
-        .returning();
+    const id = crypto.randomUUID();
+    // Insert post
+    const [post] = await db
+      .insert(posts)
+      .values({
+        id,
+        title: content.title,
+        slug,
+        content: content.content,
+        status: content.status || "DRAFT",
+        excerpt: content.excerpt,
+        featuredImageUrl: content.featuredImageUrl,
+      })
+      .returning();
 
-      // Insert categories if provided
-      if (content.categories && content.categories.length > 0) {
-        await db.insert(postsCategories).values(
-          content.categories.map((categoryId) => ({
-            postId: post.id,
-            categoryId,
-          }))
-        );
-      }
+    // Insert categories if provided
+    if (content.categoryIds && content.categoryIds.length > 0) {
+      await db.insert(postsCategories).values(
+        content.categoryIds.map((categoryId) => ({
+          postId: post.id,
+          categoryId,
+        }))
+      );
+    }
 
-      // Insert tags if provided
-      if (content.tags && content.tags.length > 0) {
-        await tx.insert(postsTags).values(
-          content.tags.map((tagId) => ({
-            postId: post.id,
-            tagId,
-          }))
-        );
-      }
+    // Insert tags if provided
+    if (content.tagIds && content.tagIds.length > 0) {
+      await db.insert(postsTags).values(
+        content.tagIds.map((tagId) => ({
+          postId: post.id,
+          tagId,
+        }))
+      );
+    }
 
-      return post;
+    return await db.query.posts.findFirst({
+      where: eq(posts.id, post.id),
+      with: {
+        tags: {
+          with: {
+            tag: true,
+          },
+        },
+        categories: {
+          with: {
+            category: true,
+          },
+        },
+      },
     });
   };
 
@@ -107,51 +115,49 @@ export const postModule = (db: DrizzleDB) => {
       tags?: number[];
     }
   ) => {
-    return await db.transaction(async (tx) => {
-      // Update post
-      const [updatedPost] = await tx
-        .update(posts)
-        .set({
-          title: data.title,
-          content: data.content,
-          status: data.status,
-          excerpt: data.excerpt,
-          featuredImageUrl: data.featuredImageUrl,
-          updatedAt: Math.floor(Date.now() / 1000), // Current Unix timestamp
-        })
-        .where(eq(posts.id, id))
-        .returning();
+    // Update post
+    const [updatedPost] = await db
+      .update(posts)
+      .set({
+        title: data.title,
+        content: data.content,
+        status: data.status,
+        excerpt: data.excerpt,
+        featuredImageUrl: data.featuredImageUrl,
+        updatedAt: Math.floor(Date.now() / 1000), // Current Unix timestamp
+      })
+      .where(eq(posts.id, id))
+      .returning();
 
-      // Update categories if provided
-      if (data.categories) {
-        // First, delete existing categories
-        await tx.delete(postsCategories).where(eq(postsCategories.postId, id));
+    // Update categories if provided
+    if (data.categories) {
+      // First, delete existing categories
+      await db.delete(postsCategories).where(eq(postsCategories.postId, id));
 
-        // Then insert new categories
-        await tx.insert(postsCategories).values(
-          data.categories.map((categoryId) => ({
-            postId: id,
-            categoryId,
-          }))
-        );
-      }
+      // Then insert new categories
+      await db.insert(postsCategories).values(
+        data.categories.map((categoryId) => ({
+          postId: id,
+          categoryId,
+        }))
+      );
+    }
 
-      // Update tags if provided
-      if (data.tags) {
-        // First, delete existing tags
-        await tx.delete(postsTags).where(eq(postsTags.postId, id));
+    // Update tags if provided
+    if (data.tags) {
+      // First, delete existing tags
+      await db.delete(postsTags).where(eq(postsTags.postId, id));
 
-        // Then insert new tags
-        await tx.insert(postsTags).values(
-          data.tags.map((tagId) => ({
-            postId: id,
-            tagId,
-          }))
-        );
-      }
+      // Then insert new tags
+      await db.insert(postsTags).values(
+        data.tags.map((tagId) => ({
+          postId: id,
+          tagId,
+        }))
+      );
+    }
 
-      return updatedPost;
-    });
+    return updatedPost;
   };
 
   const remove = async (id: string) => {

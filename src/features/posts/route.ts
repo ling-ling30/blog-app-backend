@@ -129,4 +129,4 @@ postsApi.delete("/:id", async (c) => {
   }
 });
 
-export default pos;
+export default postsApi;

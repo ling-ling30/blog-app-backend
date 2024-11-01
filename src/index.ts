@@ -5,6 +5,8 @@ import { logger } from "hono/logger";
 import { config } from "dotenv";
 import { Context } from "./types";
 import categoriesApi from "./features/categories/route";
+import postsApi from "./features/posts/route";
+import tagsApi from "./features/tags/route";
 
 const app = new OpenAPIHono<Context>();
 
@@ -18,6 +20,8 @@ app.get("/", (c) => {
   return c.text("Hello Hono!");
 });
 app.route("/categories", categoriesApi);
+app.route("/posts", postsApi);
+app.route("/tags", tagsApi);
 
 app.notFound(notFound);
 app.onError(onError);

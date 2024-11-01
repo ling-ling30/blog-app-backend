@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { categories } from "./db";
 
 export type Context = {
   Bindings: CloudflareBindings;
@@ -27,6 +28,8 @@ export const createPostSchema = z.object({
   excerpt: z.string().max(255).optional(),
   featuredImageUrl: z.string().url().optional(),
   status: z.enum([PostStatus.DRAFT, PostStatus.PUBLISHED, PostStatus.ARCHIVED]),
+  categoryIds: z.array(z.number()).optional(),
+  tagIds: z.array(z.number()).optional(),
   viewCount: z.number().nonnegative().optional().default(0),
   publishedAt: z.number().optional(), // assuming UNIX timestamp
   createdAt: z.number().optional(),
