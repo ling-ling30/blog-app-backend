@@ -15,6 +15,14 @@ postsApi.get("/", async (c) => {
     const tagId = c.req.query("tagId");
     const limit = Number(c.req.query("limit") || 10);
     const offset = Number(c.req.query("offset") || 0);
+    const publish = c.req.query("isPublished");
+
+    let isPublished;
+    if (publish === "true") {
+      isPublished = true;
+    } else {
+      isPublished = false;
+    }
 
     const posts = await db.getAll({
       status: status as any,
@@ -22,6 +30,7 @@ postsApi.get("/", async (c) => {
       tagId: tagId ? Number(tagId) : undefined,
       limit,
       offset,
+      isPublished: publish ? isPublished : undefined,
     });
 
     return c.json(posts);

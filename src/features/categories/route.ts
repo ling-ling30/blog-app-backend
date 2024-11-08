@@ -8,12 +8,7 @@ type Category = {
 
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { eq } from "drizzle-orm";
-import {
-  Context,
-  createCategorySchema,
-  updateCategorySchema,
-} from "../../types";
+import { Context, createCategorySchema } from "../../types";
 import { categoryModule } from "./module";
 import { getDB } from "../../db";
 

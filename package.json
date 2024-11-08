@@ -11,15 +11,19 @@
   "dependencies": {
     "@hono/node-server": "^1.13.3",
     "@hono/zod-openapi": "^0.16.4",
+    "bcryptjs": "^2.4.3",
     "dotenv": "^16.4.5",
     "drizzle-orm": "^0.36.0",
     "hono": "^4.6.8",
+    "jose": "^5.9.6",
+    "js": "^0.1.0",
     "my-hono-app": "file:",
     "stoker": "^1.2.7",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20241022.0",
+    "@types/bcryptjs": "^2.4.6",
     "drizzle-kit": "^0.27.0",
     "tsx": "^4.19.2",
     "wrangler": "^3.84.0"

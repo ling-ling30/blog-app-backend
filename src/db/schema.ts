@@ -8,6 +8,13 @@ export const PostStatus = {
   ARCHIVED: "archived",
 } as const;
 
+//User
+export const users = table("users", {
+  id: t.text("id").primaryKey(),
+  username: t.text("username").notNull().unique(),
+  password: t.text("password").notNull(),
+});
+
 //post
 export const posts = table(
   "posts",

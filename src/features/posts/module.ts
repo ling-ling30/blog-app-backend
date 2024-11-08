@@ -1,6 +1,6 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql, desc } from "drizzle-orm";
 import { posts, postsCategories, postsTags, DrizzleDB } from "../../db";
-import { PostStatus } from "../../db/schema"; // Assuming you've defined this
+import { categories, PostStatus, tags } from "../../db/schema"; // Assuming you've defined this
 import { z } from "zod";
 import { createPostSchema } from "../../types";
 
@@ -72,32 +72,52 @@ export const postModule = (db: DrizzleDB) => {
       tagId?: number;
       limit?: number;
       offset?: number;
+      isPublished?: boolean;
     } = {}
   ) => {
-    const { status, categoryId, tagId, limit = 10, offset = 0 } = filters;
+    const {
+      status,
+      categoryId,
+      tagId,
+      limit = 10,
+      offset = 0,
+      isPublished,
+    } = filters;
 
-    // Collect conditions into an array
     const conditions = [];
+    if (isPublished) conditions.push(eq(posts.status, PostStatus.PUBLISHED));
     if (status) conditions.push(eq(posts.status, status));
     if (categoryId) conditions.push(eq(postsCategories.categoryId, categoryId));
     if (tagId) conditions.push(eq(postsTags.tagId, tagId));
 
-    // Build the query with the collected conditions
-    const query = db
+    return await db
       .select({
-        post: posts,
-        categories: postsCategories,
-        tags: postsTags,
+        id: posts.id,
+        title: posts.title,
+        slug: posts.slug,
+        content: posts.content,
+        excerpt: posts.excerpt,
+        featuredImageUrl: posts.featuredImageUrl,
+        status: posts.status,
+        viewCount: posts.viewCount,
+        createdAt: posts.createdAt,
+        updatedAt: posts.updatedAt,
+        publishedAt: posts.publishedAt,
+        categories: sql<string>`GROUP_CONCAT(DISTINCT ${categories.name})`.as(
+          "categories"
+        ),
+        tags: sql<string>`GROUP_CONCAT(DISTINCT ${tags.name})`.as("tags"),
       })
       .from(posts)
       .leftJoin(postsCategories, eq(posts.id, postsCategories.postId))
+      .leftJoin(categories, eq(postsCategories.categoryId, categories.id))
       .leftJoin(postsTags, eq(posts.id, postsTags.postId))
-      .where(and(...conditions)) // Apply the conditions using `and()`
+      .leftJoin(tags, eq(postsTags.tagId, tags.id))
+      .where(and(...conditions))
+      .groupBy(posts.id)
       .limit(limit)
       .offset(offset)
-      .orderBy(posts.createdAt);
-
-    return await query.all();
+      .orderBy(desc(posts.createdAt));
   };
 
   const getById = async (id: string) => {
@@ -105,7 +125,49 @@ export const postModule = (db: DrizzleDB) => {
   };
 
   const getBySlug = async (slug: string) => {
-    return await db.select().from(posts).where(eq(posts.slug, slug)).get();
+    const post = await db
+      .select({
+        post: {
+          id: posts.id,
+          title: posts.title,
+          slug: posts.slug,
+          content: posts.content,
+          excerpt: posts.excerpt,
+          featuredImageUrl: posts.featuredImageUrl,
+          status: posts.status,
+          viewCount: posts.viewCount,
+          createdAt: posts.createdAt,
+          updatedAt: posts.updatedAt,
+          publishedAt: posts.publishedAt,
+        },
+        categories: sql<string>`GROUP_CONCAT(DISTINCT json_object(
+          'id', ${categories.id}, 
+          'name', ${categories.name}, 
+          'slug', ${categories.slug}
+        ))`.as("categories"),
+        tags: sql<string>`GROUP_CONCAT(DISTINCT json_object(
+          'id', ${tags.id}, 
+          'name', ${tags.name}, 
+          'slug', ${tags.slug}
+        ))`.as("tags"),
+      })
+      .from(posts)
+      .leftJoin(postsCategories, eq(posts.id, postsCategories.postId))
+      .leftJoin(categories, eq(postsCategories.categoryId, categories.id))
+      .leftJoin(postsTags, eq(posts.id, postsTags.postId))
+      .leftJoin(tags, eq(postsTags.tagId, tags.id))
+      .where(eq(posts.slug, slug))
+      .groupBy(posts.id)
+      .get();
+
+    if (!post) return null;
+
+    // Parse JSON strings back to arrays
+    return {
+      ...post.post,
+      categories: post.categories ? JSON.parse(`[${post.categories}]`) : [],
+      tags: post.tags ? JSON.parse(`[${post.tags}]`) : [],
+    };
   };
 
   const update = async (
