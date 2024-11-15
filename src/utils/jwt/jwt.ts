@@ -1,12 +1,8 @@
 import * as jose from "jose";
 
-const JWT_SECRET = process.env.JWT_SECRET;
-
-const secret = new TextEncoder().encode(JWT_SECRET);
-// const secret = JWT_SECRET;
-
 const verifyToken = async (token: string) => {
   try {
+    const secret = new TextEncoder().encode("JWT_SECRET");
     const { payload, protectedHeader } = await jose.jwtVerify(token, secret);
 
     return payload.user;

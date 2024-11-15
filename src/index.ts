@@ -2,7 +2,6 @@ import { drizzle } from "drizzle-orm/d1";
 import { notFound, onError } from "stoker/middlewares";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { logger } from "hono/logger";
-import { config } from "dotenv";
 import { Context } from "./types";
 import categoriesApi from "./features/categories/route";
 import postsApi from "./features/posts/route";
@@ -10,6 +9,7 @@ import tagsApi from "./features/tags/route";
 import { authApi } from "./features/authentication/route";
 import publicApi from "./features/publicRoutes/route";
 import { verifyToken } from "./utils/jwt/jwt";
+import { cors } from "hono/cors";
 
 const app = new OpenAPIHono<Context>();
 
@@ -17,31 +17,60 @@ export type Env = {
   DB: D1Database;
 };
 
+// Enable CORS and add logging middleware at the top
+app.use("*", async (c, next) => {
+  const origin = c.req.header("Origin") || "*"; // Get the request's Origin header
+  c.header("Access-Control-Allow-Origin", origin === "null" ? "*" : origin); // Use dynamic origin
+  c.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  c.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  c.header("Access-Control-Allow-Credentials", "true"); // Allow credentials
+  if (c.req.method === "OPTIONS") {
+    return c.body(null, 204); // Handle preflight requests
+  }
+  await next();
+});
+
+app.options("*", (c) => {
+  c.header("Access-Control-Allow-Origin", "*");
+  c.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  c.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  return c.body(null, 204);
+});
+
 app.use(logger());
 
+// Basic route for debugging
 app.get("/", (c) => {
   return c.text("Hello Hono!");
 });
-app.route("/auth", authApi);
 
+// Public routes
+app.route("/auth", authApi);
 app.route("/public", publicApi);
 
-//auth
-app.use(async (c, next) => {
+// Authorization middleware (only apply it to specific routes)
+app.use("/categories/*", async (c, next) => {
   const token = c.req.header("authorization");
   if (!token) {
     return c.json({ error: "Unauthorized" }, 401);
-  } else {
+  }
+
+  try {
     const decodedToken = await verifyToken(token);
+    if (!decodedToken) throw new Error("Invalid token");
+  } catch (error) {
+    return c.json({ error: "Unauthorized" }, 401);
   }
 
   await next();
 });
 
+// Protected routes
 app.route("/categories", categoriesApi);
 app.route("/posts", postsApi);
 app.route("/tags", tagsApi);
 
+// Error handling
 app.notFound(notFound);
 app.onError(onError);
 

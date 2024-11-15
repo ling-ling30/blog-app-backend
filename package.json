@@ -14,7 +14,7 @@
     "bcryptjs": "^2.4.3",
     "dotenv": "^16.4.5",
     "drizzle-orm": "^0.36.0",
-    "hono": "^4.6.8",
+    "hono": "^4.6.10",
     "jose": "^5.9.6",
     "js": "^0.1.0",
     "my-hono-app": "file:",
@@ -26,6 +26,6 @@
     "@types/bcryptjs": "^2.4.6",
     "drizzle-kit": "^0.27.0",
     "tsx": "^4.19.2",
-    "wrangler": "^3.84.0"
+    "wrangler": "^3.87.0"
   }
 }
