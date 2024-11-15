@@ -1,9 +1,9 @@
 import * as jose from "jose";
+import env from "../../../env";
 
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = env.JWT_SECRET;
 
 const secret = new TextEncoder().encode(JWT_SECRET);
-// const secret = JWT_SECRET;
 
 const verifyToken = async (token: string) => {
   try {
