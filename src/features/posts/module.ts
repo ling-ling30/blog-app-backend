@@ -1,17 +1,26 @@
-import { eq, and, sql, desc } from "drizzle-orm";
+import { eq, and, sql, desc, asc, or, like } from "drizzle-orm";
 import { posts, postsCategories, postsTags, DrizzleDB } from "../../db";
 import { categories, PostStatus, tags } from "../../db/schema"; // Assuming you've defined this
 import { z } from "zod";
-import { createPostSchema } from "../../types";
+import {
+  Category,
+  createPostSchema,
+  Post,
+  PostWithRelations,
+  Tag,
+} from "../../types";
 
 export const postModule = (db: DrizzleDB) => {
   const create = async (content: z.infer<typeof createPostSchema>) => {
+    const randomString = crypto.randomUUID();
     // Improve slug generation
-    const slug = content.title
+    const sluggedTitle = content.title
       .toLowerCase()
       .trim()
       .replace(/[^\w\s-]/g, "") // Remove special characters
       .replace(/\s+/g, "-"); // Replace spaces with hyphens
+
+    const slug = sluggedTitle + `-${randomString}`;
 
     const id = crypto.randomUUID();
     // Insert post
@@ -31,9 +40,9 @@ export const postModule = (db: DrizzleDB) => {
     // Insert categories if provided
     if (content.categoryIds && content.categoryIds.length > 0) {
       await db.insert(postsCategories).values(
-        content.categoryIds.map((categoryId) => ({
+        content.categoryIds.map((category) => ({
           postId: post.id,
-          categoryId,
+          categoryId: category.id,
         }))
       );
     }
@@ -41,9 +50,9 @@ export const postModule = (db: DrizzleDB) => {
     // Insert tags if provided
     if (content.tagIds && content.tagIds.length > 0) {
       await db.insert(postsTags).values(
-        content.tagIds.map((tagId) => ({
+        content.tagIds.map((tag) => ({
           postId: post.id,
-          tagId,
+          tagId: tag.id,
         }))
       );
     }
@@ -73,8 +82,11 @@ export const postModule = (db: DrizzleDB) => {
       limit?: number;
       offset?: number;
       isPublished?: boolean;
+      search?: string;
+      sortBy?: "createdAt" | "title" | "viewCount" | "publishedAt";
+      sortOrder?: "asc" | "desc";
     } = {}
-  ) => {
+  ): Promise<PostWithRelations[]> => {
     const {
       status,
       categoryId,
@@ -82,6 +94,9 @@ export const postModule = (db: DrizzleDB) => {
       limit = 10,
       offset = 0,
       isPublished,
+      search,
+      sortBy = "createdAt",
+      sortOrder = "desc",
     } = filters;
 
     const conditions = [];
@@ -89,8 +104,35 @@ export const postModule = (db: DrizzleDB) => {
     if (status) conditions.push(eq(posts.status, status));
     if (categoryId) conditions.push(eq(postsCategories.categoryId, categoryId));
     if (tagId) conditions.push(eq(postsTags.tagId, tagId));
+    if (search) {
+      conditions.push(
+        or(
+          like(posts.title, `%${search}%`),
+          like(posts.content, `%${search}%`),
+          like(posts.excerpt, `%${search}%`)
+        )
+      );
+    }
 
-    return await db
+    // Type-safe sorting configuration
+    const sortConfig = {
+      createdAt: () =>
+        sortOrder === "desc" ? desc(posts.createdAt) : asc(posts.createdAt),
+      title: () =>
+        sortOrder === "desc" ? desc(posts.title) : asc(posts.title),
+      viewCount: () =>
+        sortOrder === "desc" ? desc(posts.viewCount) : asc(posts.viewCount),
+      publishedAt: () =>
+        sortOrder === "desc" ? desc(posts.publishedAt) : asc(posts.publishedAt),
+    } as const;
+
+    const getSortExpression = () => {
+      return (
+        sortConfig[sortBy as keyof typeof sortConfig] || sortConfig.createdAt
+      )();
+    };
+
+    const rawData = await db
       .select({
         id: posts.id,
         title: posts.title,
@@ -103,10 +145,16 @@ export const postModule = (db: DrizzleDB) => {
         createdAt: posts.createdAt,
         updatedAt: posts.updatedAt,
         publishedAt: posts.publishedAt,
-        categories: sql<string>`GROUP_CONCAT(DISTINCT ${categories.name})`.as(
-          "categories"
-        ),
-        tags: sql<string>`GROUP_CONCAT(DISTINCT ${tags.name})`.as("tags"),
+        categories: sql<string>`GROUP_CONCAT(DISTINCT json_object(
+          'id', ${categories.id},
+          'name', ${categories.name},
+          'slug', ${categories.slug}
+        ))`.as("categories"),
+        tags: sql<string>`GROUP_CONCAT(DISTINCT json_object(
+          'id', ${tags.id},
+          'name', ${tags.name},
+          'slug', ${tags.slug}
+        ))`.as("tags"),
       })
       .from(posts)
       .leftJoin(postsCategories, eq(posts.id, postsCategories.postId))
@@ -117,14 +165,35 @@ export const postModule = (db: DrizzleDB) => {
       .groupBy(posts.id)
       .limit(limit)
       .offset(offset)
-      .orderBy(desc(posts.createdAt));
+      .orderBy(getSortExpression());
+
+    // Transform raw data into Post[] with parsed categories and tags
+    const postsData: PostWithRelations[] = rawData.map((item) => ({
+      id: item.id,
+      title: item.title,
+      slug: item.slug,
+      content: item.content,
+      excerpt: item.excerpt,
+      featuredImageUrl: item.featuredImageUrl,
+      status: item.status as "DRAFT" | "PUBLISHED" | "ARCHIVED",
+      viewCount: item.viewCount,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+      publishedAt: item.publishedAt,
+      categories: item.categories
+        ? (JSON.parse(`[${item.categories}]`) as Category[])
+        : [],
+      tags: item.tags ? (JSON.parse(`[${item.tags}]`) as Tag[]) : [],
+    }));
+
+    return postsData;
   };
 
   const getById = async (id: string) => {
     return await db.select().from(posts).where(eq(posts.id, id)).get();
   };
 
-  const getBySlug = async (slug: string) => {
+  const getBySlug = async (slug: string): Promise<PostWithRelations | null> => {
     const post = await db
       .select({
         post: {
@@ -141,13 +210,13 @@ export const postModule = (db: DrizzleDB) => {
           publishedAt: posts.publishedAt,
         },
         categories: sql<string>`GROUP_CONCAT(DISTINCT json_object(
-          'id', ${categories.id}, 
-          'name', ${categories.name}, 
+          'id', ${categories.id},
+          'name', ${categories.name},
           'slug', ${categories.slug}
         ))`.as("categories"),
         tags: sql<string>`GROUP_CONCAT(DISTINCT json_object(
-          'id', ${tags.id}, 
-          'name', ${tags.name}, 
+          'id', ${tags.id},
+          'name', ${tags.name},
           'slug', ${tags.slug}
         ))`.as("tags"),
       })
@@ -162,11 +231,18 @@ export const postModule = (db: DrizzleDB) => {
 
     if (!post) return null;
 
-    // Parse JSON strings back to arrays
+    // Parse the GROUP_CONCAT results safely
+    const parsedCategories: Category[] = post.categories
+      ? JSON.parse(`[${post.categories}]`)
+      : [];
+
+    const parsedTags: Tag[] = post.tags ? JSON.parse(`[${post.tags}]`) : [];
+
+    // Return the properly typed result
     return {
       ...post.post,
-      categories: post.categories ? JSON.parse(`[${post.categories}]`) : [],
-      tags: post.tags ? JSON.parse(`[${post.tags}]`) : [],
+      categories: parsedCategories,
+      tags: parsedTags,
     };
   };
 
@@ -226,6 +302,28 @@ export const postModule = (db: DrizzleDB) => {
     return await db.delete(posts).where(eq(posts.id, id)).returning().get();
   };
 
+  const publish = async (id: string) => {
+    const post = await db
+      .update(posts)
+      .set({
+        status: PostStatus.PUBLISHED,
+        publishedAt: Math.floor(Date.now() / 1000), // Current Unix timestamp
+      })
+      .where(eq(posts.id, id))
+      .returning();
+
+    const newSlug = post[0].title
+      .toLowerCase()
+      .trim()
+      .replace(/[^\w\s-]/g, "") // Remove special characters
+      .replace(/\s+/g, "-"); // Replace spaces with hyphens
+
+    const data = await db.update(posts).set({
+      slug: newSlug,
+    });
+
+    return data;
+  };
   return {
     create,
     getAll,
@@ -233,5 +331,6 @@ export const postModule = (db: DrizzleDB) => {
     getBySlug,
     update,
     remove,
+    publish,
   };
 };

@@ -45,10 +45,16 @@ export const publicModule = (db: DrizzleDB) => {
         featuredImageUrl: posts.featuredImageUrl,
         viewCount: posts.viewCount,
         publishedAt: posts.publishedAt,
-        categories: sql<string>`GROUP_CONCAT(DISTINCT ${categories.name})`.as(
-          "categories"
-        ),
-        tags: sql<string>`GROUP_CONCAT(DISTINCT ${tags.name})`.as("tags"),
+        categories: sql<string>`GROUP_CONCAT(DISTINCT json_object(
+          'id', ${categories.id},
+          'name', ${categories.name},
+          'slug', ${categories.slug}
+        ))`.as("categories"),
+        tags: sql<string>`GROUP_CONCAT(DISTINCT json_object(
+          'id', ${tags.id},
+          'name', ${tags.name},
+          'slug', ${tags.slug}
+        ))`.as("tags"),
       })
       .from(posts)
       .leftJoin(postsCategories, eq(posts.id, postsCategories.postId))

@@ -3,7 +3,7 @@ import * as jose from "jose";
 const verifyToken = async (token: string) => {
   try {
     const secret = new TextEncoder().encode("JWT_SECRET");
-    const { payload, protectedHeader } = await jose.jwtVerify(token, secret);
+    const { payload } = await jose.jwtVerify(token, secret);
 
     return payload.user;
   } catch (error: any) {

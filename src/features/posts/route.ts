@@ -10,27 +10,38 @@ const postsApi = new Hono<Context>();
 postsApi.get("/", async (c) => {
   try {
     const db = postModule(getDB(c));
+
+    // Query parameters
     const status = c.req.query("status");
     const categoryId = c.req.query("categoryId");
     const tagId = c.req.query("tagId");
     const limit = Number(c.req.query("limit") || 10);
     const offset = Number(c.req.query("offset") || 0);
     const publish = c.req.query("isPublished");
+    const search = c.req.query("search");
+    const sortBy = c.req.query("sortBy") as
+      | "createdAt"
+      | "title"
+      | "viewCount"
+      | "publishedAt";
+    const sortOrder = c.req.query("sortOrder") as "asc" | "desc";
 
-    let isPublished;
-    if (publish === "true") {
-      isPublished = true;
-    } else {
-      isPublished = false;
-    }
+    // Parse `isPublished` query parameter
+    let isPublished: boolean | undefined = undefined;
+    if (publish === "true") isPublished = true;
+    if (publish === "false") isPublished = false;
 
+    // Fetch posts with applied filters
     const posts = await db.getAll({
       status: status as any,
       categoryId: categoryId ? Number(categoryId) : undefined,
       tagId: tagId ? Number(tagId) : undefined,
       limit,
       offset,
-      isPublished: publish ? isPublished : undefined,
+      isPublished,
+      search: search || undefined,
+      sortBy: sortBy || undefined,
+      sortOrder: sortOrder || undefined,
     });
 
     return c.json(posts);
@@ -116,6 +127,25 @@ postsApi.put("/:id", zValidator("json", updatePostSchema), async (c) => {
   } catch (error) {
     console.error("Failed to update post:", error);
     return c.json({ error: "Failed to update post" }, 500);
+  }
+});
+
+//publish post
+postsApi.put("/:id/publish", async (c) => {
+  try {
+    const id = c.req.param("id");
+    const db = postModule(getDB(c));
+
+    const result = await db.publish(id);
+
+    if (!result) {
+      return c.json({ error: "Post not found" }, 404);
+    }
+
+    return c.json({ message: "published", data: result });
+  } catch (error) {
+    console.error("Failed to publish post:", error);
+    return c.json({ error: "Failed to publish post" }, 500);
   }
 });
 

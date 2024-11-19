@@ -12,3 +12,8 @@ database_name = "blog-db"
 database_id = "27fd3b6c-864c-4f6d-a7db-79835f3c1306"
 preview_database_id = "27fd3b6c-864c-4f6d-a7db-79835f3c1306"
 migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = 'R2' 
+bucket_name = 'andy-blog'
+preview_bucket_name = 'andy-blog-dev'

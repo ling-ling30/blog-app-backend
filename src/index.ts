@@ -10,11 +10,13 @@ import { authApi } from "./features/authentication/route";
 import publicApi from "./features/publicRoutes/route";
 import { verifyToken } from "./utils/jwt/jwt";
 import { cors } from "hono/cors";
+import { uploadApi } from "./features/upload/route";
 
 const app = new OpenAPIHono<Context>();
 
 export type Env = {
   DB: D1Database;
+  R2: R2Bucket;
 };
 
 // Enable CORS and add logging middleware at the top
@@ -48,17 +50,36 @@ app.get("/", (c) => {
 app.route("/auth", authApi);
 app.route("/public", publicApi);
 
+app.get("/files/:filename", async (c, next) => {
+  const param = c.req.param("filename");
+  const file = await c.env.R2.get(param);
+
+  if (!file) {
+    return c.json({
+      message: "File not found",
+    });
+  }
+
+  const headers = new Headers();
+  file.writeHttpMetadata(headers);
+  headers.set("etag", file.httpEtag);
+
+  return new Response(file.body, {
+    headers,
+  });
+});
+
 // Authorization middleware (only apply it to specific routes)
-app.use("/categories/*", async (c, next) => {
+app.use("/*", async (c, next) => {
   const token = c.req.header("authorization");
   if (!token) {
     return c.json({ error: "Unauthorized" }, 401);
   }
-
   try {
     const decodedToken = await verifyToken(token);
     if (!decodedToken) throw new Error("Invalid token");
   } catch (error) {
+    console.error("Error verifying token:", error);
     return c.json({ error: "Unauthorized" }, 401);
   }
 
@@ -69,6 +90,7 @@ app.use("/categories/*", async (c, next) => {
 app.route("/categories", categoriesApi);
 app.route("/posts", postsApi);
 app.route("/tags", tagsApi);
+app.route("/upload", uploadApi);
 
 // Error handling
 app.notFound(notFound);
