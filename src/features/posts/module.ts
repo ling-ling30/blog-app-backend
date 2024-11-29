@@ -168,23 +168,40 @@ export const postModule = (db: DrizzleDB) => {
       .orderBy(getSortExpression());
 
     // Transform raw data into Post[] with parsed categories and tags
-    const postsData: PostWithRelations[] = rawData.map((item) => ({
-      id: item.id,
-      title: item.title,
-      slug: item.slug,
-      content: item.content,
-      excerpt: item.excerpt,
-      featuredImageUrl: item.featuredImageUrl,
-      status: item.status as "DRAFT" | "PUBLISHED" | "ARCHIVED",
-      viewCount: item.viewCount,
-      createdAt: item.createdAt,
-      updatedAt: item.updatedAt,
-      publishedAt: item.publishedAt,
-      categories: item.categories
-        ? (JSON.parse(`[${item.categories}]`) as Category[])
-        : [],
-      tags: item.tags ? (JSON.parse(`[${item.tags}]`) as Tag[]) : [],
-    }));
+    const postsData: PostWithRelations[] = rawData.map((item) => {
+      let categoryArray: Category[] = [];
+      let tagArray: Tag[] = [];
+
+      const parsedCategories: Category[] = item.categories
+        ? JSON.parse(`[${item.categories}]`)
+        : [];
+      for (const category of parsedCategories) {
+        if (category.id !== null) categoryArray.push(category);
+      }
+
+      const parsedTags: Tag[] = item.tags ? JSON.parse(`[${item.tags}]`) : [];
+
+      for (const tag of parsedTags) {
+        if (tag.id !== null) tagArray.push(tag);
+      }
+      // Return the properly typed result
+
+      return {
+        id: item.id,
+        title: item.title,
+        slug: item.slug,
+        content: item.content,
+        excerpt: item.excerpt,
+        featuredImageUrl: item.featuredImageUrl,
+        status: item.status as "DRAFT" | "PUBLISHED" | "ARCHIVED",
+        viewCount: item.viewCount,
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+        publishedAt: item.publishedAt,
+        categories: categoryArray,
+        tags: tagArray,
+      };
+    });
 
     return postsData;
   };
@@ -232,28 +249,38 @@ export const postModule = (db: DrizzleDB) => {
     if (!post) return null;
 
     // Parse the GROUP_CONCAT results safely
+    let categoryArray: Category[] = [];
+    let tagArray: Tag[] = [];
+
     const parsedCategories: Category[] = post.categories
       ? JSON.parse(`[${post.categories}]`)
       : [];
+    for (const category of parsedCategories) {
+      if (category.id !== null) categoryArray.push(category);
+    }
 
     const parsedTags: Tag[] = post.tags ? JSON.parse(`[${post.tags}]`) : [];
 
+    for (const tag of parsedTags) {
+      if (tag.id !== null) tagArray.push(tag);
+    }
     // Return the properly typed result
     return {
       ...post.post,
-      categories: parsedCategories,
-      tags: parsedTags,
+      categories: categoryArray,
+      tags: tagArray,
     };
   };
 
   const update = async (
     id: string,
     data: Partial<typeof posts.$inferInsert> & {
-      categories?: number[];
-      tags?: number[];
+      categoryIds?: Category[] | [];
+      tagIds?: Tag[] | [];
     }
   ) => {
     // Update post
+
     const [updatedPost] = await db
       .update(posts)
       .set({
@@ -268,29 +295,29 @@ export const postModule = (db: DrizzleDB) => {
       .returning();
 
     // Update categories if provided
-    if (data.categories) {
+    if (data.categoryIds && data.categoryIds.length > 0) {
       // First, delete existing categories
       await db.delete(postsCategories).where(eq(postsCategories.postId, id));
-
       // Then insert new categories
       await db.insert(postsCategories).values(
-        data.categories.map((categoryId) => ({
+        data.categoryIds.map((category) => ({
           postId: id,
-          categoryId,
+          categoryId: category.id,
         }))
       );
     }
 
     // Update tags if provided
-    if (data.tags) {
+    if (data.tagIds && data.tagIds.length > 0) {
       // First, delete existing tags
+
       await db.delete(postsTags).where(eq(postsTags.postId, id));
 
       // Then insert new tags
       await db.insert(postsTags).values(
-        data.tags.map((tagId) => ({
+        data.tagIds.map((tag) => ({
           postId: id,
-          tagId,
+          tagId: tag.id,
         }))
       );
     }
@@ -312,17 +339,7 @@ export const postModule = (db: DrizzleDB) => {
       .where(eq(posts.id, id))
       .returning();
 
-    const newSlug = post[0].title
-      .toLowerCase()
-      .trim()
-      .replace(/[^\w\s-]/g, "") // Remove special characters
-      .replace(/\s+/g, "-"); // Replace spaces with hyphens
-
-    const data = await db.update(posts).set({
-      slug: newSlug,
-    });
-
-    return data;
+    return post;
   };
   return {
     create,
