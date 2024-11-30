@@ -1,4 +1,4 @@
-import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, like, sql } from "drizzle-orm";
 import {
   categories,
   DrizzleDB,
@@ -8,6 +8,7 @@ import {
   PostStatus,
   tags,
 } from "../../db";
+import { Category, Tag } from "../../types";
 
 export const publicModule = (db: DrizzleDB) => {
   const fetchAllCategory = async () => {
@@ -17,13 +18,14 @@ export const publicModule = (db: DrizzleDB) => {
 
   const getPublicPosts = async (
     filters: {
+      title?: string;
       categoryId?: number;
       tagId?: number;
       limit?: number;
       offset?: number;
     } = {}
   ) => {
-    const { categoryId, tagId, limit = 10, offset = 0 } = filters;
+    const { title, categoryId, tagId, limit = 10, offset = 0 } = filters;
 
     const conditions = [
       // Only published posts
@@ -32,10 +34,11 @@ export const publicModule = (db: DrizzleDB) => {
       isNotNull(posts.publishedAt),
     ];
 
+    if (title) conditions.push(like(posts.title, `%${title}%`));
     if (categoryId) conditions.push(eq(postsCategories.categoryId, categoryId));
     if (tagId) conditions.push(eq(postsTags.tagId, tagId));
 
-    return await db
+    const rawData = await db
       .select({
         id: posts.id,
         title: posts.title,
@@ -66,6 +69,40 @@ export const publicModule = (db: DrizzleDB) => {
       .limit(limit)
       .offset(offset)
       .orderBy(desc(posts.publishedAt));
+
+    const postsData = rawData.map((item) => {
+      let categoryArray: Category[] = [];
+      let tagArray: Tag[] = [];
+
+      const parsedCategories: Category[] = item.categories
+        ? JSON.parse(`[${item.categories}]`)
+        : [];
+      for (const category of parsedCategories) {
+        if (category.id !== null) categoryArray.push(category);
+      }
+
+      const parsedTags: Tag[] = item.tags ? JSON.parse(`[${item.tags}]`) : [];
+
+      for (const tag of parsedTags) {
+        if (tag.id !== null) tagArray.push(tag);
+      }
+      // Return the properly typed result
+
+      return {
+        id: item.id,
+        title: item.title,
+        slug: item.slug,
+        content: item.content,
+        excerpt: item.excerpt,
+        featuredImageUrl: item.featuredImageUrl,
+        viewCount: item.viewCount,
+        publishedAt: item.publishedAt,
+        categories: categoryArray,
+        tags: tagArray,
+      };
+    });
+
+    return postsData;
   };
 
   const getPublicPostBySlugWithStats = async (slug: string) => {

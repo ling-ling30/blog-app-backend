@@ -33,10 +33,11 @@ publicApi.get("/tags", async (c) => {
 // Get all public posts with filters
 publicApi.get("/posts", async (c) => {
   try {
-    const { categoryId, tagId, limit, offset } = c.req.query();
+    const { categoryId, tagId, limit, offset, title } = c.req.query();
     const db = publicModule(getDB(c));
 
     const posts = await db.getPublicPosts({
+      title: title ? title : undefined,
       categoryId: categoryId ? Number(categoryId) : undefined,
       tagId: tagId ? Number(tagId) : undefined,
       limit: limit ? Number(limit) : 10,
