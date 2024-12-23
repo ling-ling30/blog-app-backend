@@ -70,4 +70,16 @@ publicApi.get("/posts/:slug", async (c) => {
   }
 });
 
+// Get featured posts
+publicApi.get("/featured-posts", async (c) => {
+  try {
+    const db = publicModule(getDB(c));
+    const featuredPosts = await db.getFeaturedPosts();
+    return c.json(featuredPosts);
+  } catch (error) {
+    console.error("Failed to fetch featured posts:", error);
+    return c.json({ error: "Failed to fetch featured posts" }, 500);
+  }
+});
+
 export default publicApi;

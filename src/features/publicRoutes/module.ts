@@ -87,13 +87,15 @@ export const publicModule = (db: DrizzleDB) => {
         if (tag.id !== null) tagArray.push(tag);
       }
       // Return the properly typed result
+      const excerpt =
+        item.excerpt ||
+        item.content.replace(/<[^>]+>/g, "").slice(0, 100) + "...";
 
       return {
         id: item.id,
         title: item.title,
         slug: item.slug,
-        content: item.content,
-        excerpt: item.excerpt,
+        excerpt,
         featuredImageUrl: item.featuredImageUrl,
         viewCount: item.viewCount,
         publishedAt: item.publishedAt,
@@ -185,7 +187,64 @@ export const publicModule = (db: DrizzleDB) => {
     return data;
   };
 
+  const getFeaturedPosts = async (limit: number = 4) => {
+    const rawData = await db
+      .select({
+        id: posts.id,
+        title: posts.title,
+        slug: posts.slug,
+        excerpt: posts.excerpt,
+        content: posts.content,
+        featuredImageUrl: posts.featuredImageUrl,
+        viewCount: posts.viewCount,
+        publishedAt: posts.publishedAt,
+        categories: sql<string>`GROUP_CONCAT(DISTINCT json_object(
+          'id', ${categories.id},
+          'name', ${categories.name},
+          'slug', ${categories.slug}
+        ))`.as("categories"),
+      })
+      .from(posts)
+      .leftJoin(postsCategories, eq(posts.id, postsCategories.postId))
+      .leftJoin(categories, eq(postsCategories.categoryId, categories.id))
+      .where(
+        and(
+          eq(posts.status, PostStatus.PUBLISHED),
+          isNotNull(posts.publishedAt),
+          isNotNull(posts.featuredImageUrl) // Only posts with featured images
+        )
+      )
+      .groupBy(posts.id)
+      .orderBy(
+        desc(posts.viewCount), // Most viewed posts first
+        desc(posts.publishedAt) // Then most recent
+      )
+      .limit(limit);
+
+    const featuredPosts = rawData.map((item) => {
+      const categoryArray = item.categories
+        ? JSON.parse(`[${item.categories}]`)
+        : [];
+      const excerpt =
+        item.excerpt ||
+        item.content.replace(/<[^>]+>/g, "").slice(0, 100) + "...";
+
+      return {
+        id: item.id,
+        title: item.title,
+        slug: item.slug,
+        excerpt,
+        featuredImageUrl: item.featuredImageUrl,
+        viewCount: item.viewCount,
+        publishedAt: item.publishedAt,
+        categories: categoryArray,
+      };
+    });
+
+    return featuredPosts;
+  };
   return {
+    getFeaturedPosts,
     fetchAllCategory,
     getPublicPosts,
     fetchAllTag,
