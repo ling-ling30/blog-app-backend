@@ -82,4 +82,15 @@ publicApi.get("/featured-posts", async (c) => {
   }
 });
 
+publicApi.get("/meta", async (c) => {
+  try {
+    const db = publicModule(getDB(c));
+    const metaData = await db.getMetaData();
+    return c.json(metaData);
+  } catch (error) {
+    console.error("Failed to fetch meta data:", error);
+    return c.json({ error: "Failed to fetch meta data" }, 500);
+  }
+});
+
 export default publicApi;

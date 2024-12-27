@@ -11,6 +11,7 @@ import publicApi from "./features/publicRoutes/route";
 import { verifyToken } from "./utils/jwt/jwt";
 import { cors } from "hono/cors";
 import { uploadApi } from "./features/upload/route";
+import { settingsApi } from "./features/settings/route";
 
 const app = new OpenAPIHono<Context>();
 
@@ -91,6 +92,7 @@ app.route("/categories", categoriesApi);
 app.route("/posts", postsApi);
 app.route("/tags", tagsApi);
 app.route("/upload", uploadApi);
+app.route("/settings", settingsApi);
 
 // Error handling
 app.notFound(notFound);

@@ -1,4 +1,5 @@
 import { relations, sql } from "drizzle-orm";
+import { pgEnum } from "drizzle-orm/pg-core";
 import { sqliteTable as table } from "drizzle-orm/sqlite-core";
 import * as t from "drizzle-orm/sqlite-core";
 
@@ -159,3 +160,9 @@ export const tags = table("tags", {
 export const tagsRelations = relations(tags, ({ many }) => ({
   posts: many(postsTags),
 }));
+
+//settings
+export const settings = table("settings", {
+  id: t.text("key").primaryKey(),
+  value: t.text("value").notNull(),
+});

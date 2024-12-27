@@ -53,8 +53,16 @@ export const createTagSchema = z.object({
   createdAt: z.coerce.date().optional(), // Coerce to Date if a number or string timestamp is passed
 });
 
+export const settingsSchema = z.object({
+  about: z.string().min(1).optional(),
+  address: z.string().min(1).optional(),
+  email: z.string().min(1).optional(),
+  phone_number: z.string().min(1).optional(),
+});
+
 // Define the updateTagSchema for updating an existing tag
 export const updateTagSchema = createTagSchema.partial();
+
 export interface Post {
   id: string;
   title: string;

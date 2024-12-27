@@ -1,4 +1,4 @@
-import { and, desc, eq, isNotNull, like, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, like, or, sql } from "drizzle-orm";
 import {
   categories,
   DrizzleDB,
@@ -6,6 +6,7 @@ import {
   postsCategories,
   postsTags,
   PostStatus,
+  settings,
   tags,
 } from "../../db";
 import { Category, Tag } from "../../types";
@@ -243,7 +244,23 @@ export const publicModule = (db: DrizzleDB) => {
 
     return featuredPosts;
   };
+
+  const getMetaData = async () => {
+    const data = await db
+      .select({ id: settings.id, value: settings.value })
+      .from(settings)
+      .where(
+        or(
+          eq(settings.id, "about"),
+          eq(settings.id, "address"),
+          eq(settings.id, "email"),
+          eq(settings.id, "phone_number")
+        )
+      );
+    return data;
+  };
   return {
+    getMetaData,
     getFeaturedPosts,
     fetchAllCategory,
     getPublicPosts,
